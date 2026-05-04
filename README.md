@@ -18,9 +18,8 @@ Minimal local time tracking for ticket-based work. The project is built in Node.
 
 ## Install
 
-This project currently has no external runtime dependencies.
-
 ```bash
+npm install
 npm test
 ```
 
@@ -80,20 +79,18 @@ The web UI is a thin layer over the existing tracker and exposes these backend r
 
 ## Jira Sync
 
-Jira sync is optional. The tracker always saves locally first, then attempts to sync completed sessions.
+Jira sync is optional. The tracker always saves locally first, then attempts to sync completed sessions. It supports scoped OAuth tokens.
 
 Environment variables used by the Jira integration:
 
 - `JIRA_BASE_URL`
-- `JIRA_EMAIL`
-- `JIRA_API_TOKEN`
+- `JIRA_API_TOKEN` (requires 'write:issue.time-tracking:jira' scope)
 
-Example shell setup:
+Example `.env` setup:
 
-```bash
-export JIRA_BASE_URL="https://your-domain.atlassian.net"
-export JIRA_EMAIL="you@example.com"
-export JIRA_API_TOKEN="your-api-token"
+```text
+JIRA_BASE_URL="https://your-domain.atlassian.net"
+JIRA_API_TOKEN="your-scoped-token"
 ```
 
 Notes:
