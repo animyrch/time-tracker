@@ -14,10 +14,10 @@ const store = createFileStateStore({ filePath: dataFilePath });
 const tracker = createTracker({ store, worklogSync });
 
 function resolvePort(value) {
-  const parsed = Number.parseInt(value ?? '3000', 10);
+  const parsed = Number.parseInt(value ?? '9999', 10);
 
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    return 3000;
+    return 9999;
   }
 
   return parsed;
