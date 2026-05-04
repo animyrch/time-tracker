@@ -16,6 +16,8 @@ const dom = {
   currentSessionBadge: document.querySelector('#current-session-badge'),
   currentSession: document.querySelector('#current-session'),
   sessionLog: document.querySelector('#session-log'),
+  yesterdaySummary: document.querySelector('#yesterday-summary'),
+  yesterdayLog: document.querySelector('#yesterday-log'),
   summaryPanel: document.querySelector('#summary-panel'),
   toast: document.querySelector('#toast')
 };
@@ -80,7 +82,7 @@ function getActiveEntrySnapshot(state, referenceDate) {
   };
 }
 
-function getTodayEntries(state, referenceDate = new Date()) {
+function getEntriesForDay(state, referenceDate = new Date(), { includeActive = false } = {}) {
   if (!state) {
     return [];
   }
@@ -91,13 +93,23 @@ function getTodayEntries(state, referenceDate = new Date()) {
       ...session,
       isActive: false
     }));
-  const activeEntry = getActiveEntrySnapshot(state, referenceDate);
+  const activeEntry = includeActive ? getActiveEntrySnapshot(state, referenceDate) : null;
 
   if (activeEntry) {
     entries.push(activeEntry);
   }
 
   return entries.sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
+}
+
+function getTodayEntries(state, referenceDate = new Date()) {
+  return getEntriesForDay(state, referenceDate, { includeActive: true });
+}
+
+function getYesterdayEntries(state, referenceDate = new Date()) {
+  const yesterday = new Date(referenceDate);
+  yesterday.setDate(referenceDate.getDate() - 1);
+  return getEntriesForDay(state, yesterday);
 }
 
 function getDashboardStatus(state, todayEntries) {
@@ -162,6 +174,38 @@ function getSummaryItems(entries) {
   return Array.from(totalsByTicket.entries())
     .map(([ticketId, durationMs]) => ({ ticketId, durationMs }))
     .sort((left, right) => right.durationMs - left.durationMs);
+}
+
+function renderRecapSummary(entries) {
+  dom.yesterdaySummary.textContent = '';
+
+  if (entries.length === 0) {
+    dom.yesterdaySummary.className = 'recap-summary empty-state';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'No tracked time yesterday.';
+    dom.yesterdaySummary.append(paragraph);
+    return;
+  }
+
+  dom.yesterdaySummary.className = 'recap-summary';
+  const totals = getSummaryItems(entries);
+  const totalDurationMs = totals.reduce((sum, item) => sum + item.durationMs, 0);
+
+  const hero = document.createElement('div');
+  hero.className = 'recap-total';
+  hero.innerHTML = `<span class="summary-label">Yesterday total</span><strong>${formatHumanDuration(totalDurationMs)}</strong>`;
+
+  const chips = document.createElement('div');
+  chips.className = 'recap-chips';
+
+  for (const item of totals) {
+    const chip = document.createElement('div');
+    chip.className = 'recap-chip';
+    chip.innerHTML = `<strong>${item.ticketId}</strong><span>${formatHumanDuration(item.durationMs)}</span>`;
+    chips.append(chip);
+  }
+
+  dom.yesterdaySummary.append(hero, chips);
 }
 
 function showToast(message) {
@@ -348,6 +392,63 @@ function renderSessionLog(entries) {
   }
 }
 
+function renderYesterdayLog(entries) {
+  dom.yesterdayLog.textContent = '';
+
+  if (entries.length === 0) {
+    dom.yesterdayLog.className = 'session-log empty-state';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'No sessions logged yesterday.';
+    dom.yesterdayLog.append(paragraph);
+    return;
+  }
+
+  dom.yesterdayLog.className = 'session-log';
+  const groups = new Map();
+
+  for (const entry of entries) {
+    if (!groups.has(entry.ticketId)) {
+      groups.set(entry.ticketId, []);
+    }
+
+    groups.get(entry.ticketId).push(entry);
+  }
+
+  for (const [ticketId, ticketEntries] of groups.entries()) {
+    const group = document.createElement('section');
+    group.className = 'ticket-group';
+
+    const title = document.createElement('h3');
+    title.className = 'ticket-group-title';
+    title.textContent = ticketId;
+    group.append(title);
+
+    for (const entry of ticketEntries) {
+      const row = document.createElement('div');
+      row.className = 'session-row';
+
+      const left = document.createElement('div');
+      const range = document.createElement('div');
+      range.className = 'session-range';
+      range.textContent = `${formatTime(entry.startAt)} → ${formatTime(entry.endAt)}`;
+      left.append(range);
+
+      const subtext = document.createElement('div');
+      subtext.className = 'session-subtext';
+      subtext.textContent = 'Completed';
+      left.append(subtext);
+
+      const right = document.createElement('strong');
+      right.textContent = formatHumanDuration(entry.durationMs);
+
+      row.append(left, right);
+      group.append(row);
+    }
+
+    dom.yesterdayLog.append(group);
+  }
+}
+
 function renderSummary(entries) {
   dom.summaryPanel.textContent = '';
 
@@ -389,9 +490,10 @@ function renderSummary(entries) {
 
 function render() {
   const now = new Date();
-  const entries = getTodayEntries(uiState.trackerState, now);
-  const dashboardStatus = getDashboardStatus(uiState.trackerState, entries);
-  const currentView = getCurrentSessionViewModel(uiState.trackerState, entries);
+  const todayEntries = getTodayEntries(uiState.trackerState, now);
+  const yesterdayEntries = getYesterdayEntries(uiState.trackerState, now);
+  const dashboardStatus = getDashboardStatus(uiState.trackerState, todayEntries);
+  const currentView = getCurrentSessionViewModel(uiState.trackerState, todayEntries);
   const headerDurationMs = currentView ? currentView.durationMs : 0;
 
   setStatusBadge(dom.statusBadge, dashboardStatus.label, dashboardStatus.tone);
@@ -402,8 +504,10 @@ function render() {
   dom.punchOutButton.disabled = !uiState.trackerState?.activeEntry;
 
   renderCurrentSession(currentView);
-  renderSessionLog(entries);
-  renderSummary(entries);
+  renderSessionLog(todayEntries);
+  renderRecapSummary(yesterdayEntries);
+  renderYesterdayLog(yesterdayEntries);
+  renderSummary(todayEntries);
 }
 
 dom.startSwitchButton.addEventListener('click', () => {
