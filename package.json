@@ -1,0 +1,13 @@
+{
+  "name": "time-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CLI time tracking for local ticket work.",
+  "bin": {
+    "time-tracker": "./src/index.js"
+  },
+  "scripts": {
+    "cli": "node src/index.js",
+    "test": "node --test"
+  }
+}
