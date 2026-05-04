@@ -1,0 +1,447 @@
+const uiState = {
+  trackerState: null,
+  connectionError: null,
+  toastTimeoutId: null
+};
+
+const dom = {
+  statusNote: document.querySelector('#status-note'),
+  statusBadge: document.querySelector('#status-badge'),
+  headerTimer: document.querySelector('#header-timer'),
+  punchInButton: document.querySelector('#punch-in-button'),
+  punchOutButton: document.querySelector('#punch-out-button'),
+  ticketInput: document.querySelector('#ticket-input'),
+  startSwitchButton: document.querySelector('#start-switch-button'),
+  pauseButton: document.querySelector('#pause-button'),
+  currentSessionBadge: document.querySelector('#current-session-badge'),
+  currentSession: document.querySelector('#current-session'),
+  sessionLog: document.querySelector('#session-log'),
+  summaryPanel: document.querySelector('#summary-panel'),
+  toast: document.querySelector('#toast')
+};
+
+function formatClockDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function formatHumanDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+
+  if (parts.length === 0 || (hours === 0 && minutes < 1)) {
+    parts.push(`${seconds}s`);
+  }
+
+  return parts.join(' ');
+}
+
+function formatTime(timestamp) {
+  return new Intl.DateTimeFormat([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(timestamp));
+}
+
+function getLocalDayKey(date) {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function isSameLocalDay(timestamp, referenceDate) {
+  return getLocalDayKey(new Date(timestamp)) === getLocalDayKey(referenceDate);
+}
+
+function getActiveEntrySnapshot(state, referenceDate) {
+  if (!state?.activeEntry) {
+    return null;
+  }
+
+  return {
+    ticketId: state.activeEntry.ticketId,
+    startAt: state.activeEntry.startAt,
+    endAt: referenceDate.toISOString(),
+    durationMs: referenceDate.getTime() - Date.parse(state.activeEntry.startAt),
+    isActive: true
+  };
+}
+
+function getTodayEntries(state, referenceDate = new Date()) {
+  if (!state) {
+    return [];
+  }
+
+  const entries = state.sessions
+    .filter((session) => isSameLocalDay(session.startAt, referenceDate) || isSameLocalDay(session.endAt, referenceDate))
+    .map((session) => ({
+      ...session,
+      isActive: false
+    }));
+  const activeEntry = getActiveEntrySnapshot(state, referenceDate);
+
+  if (activeEntry) {
+    entries.push(activeEntry);
+  }
+
+  return entries.sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
+}
+
+function getDashboardStatus(state, todayEntries) {
+  if (state?.activeEntry) {
+    return {
+      label: 'Working',
+      tone: 'working',
+      note: 'An active ticket is running right now.'
+    };
+  }
+
+  if (todayEntries.length > 0) {
+    return {
+      label: 'Paused',
+      tone: 'paused',
+      note: 'No active ticket. Enter one to resume instantly.'
+    };
+  }
+
+  return {
+    label: 'Not started',
+    tone: 'idle',
+    note: 'No ticket started today yet.'
+  };
+}
+
+function getCurrentSessionViewModel(state, todayEntries) {
+  if (state?.activeEntry) {
+    const activeEntry = todayEntries.find((entry) => entry.isActive);
+
+    return {
+      ticketId: activeEntry.ticketId,
+      startAt: activeEntry.startAt,
+      durationMs: activeEntry.durationMs,
+      statusLabel: 'Working',
+      tone: 'working'
+    };
+  }
+
+  const latestCompletedEntry = [...todayEntries].reverse().find((entry) => !entry.isActive);
+
+  if (latestCompletedEntry) {
+    return {
+      ticketId: latestCompletedEntry.ticketId,
+      startAt: latestCompletedEntry.startAt,
+      durationMs: latestCompletedEntry.durationMs,
+      statusLabel: 'Paused',
+      tone: 'paused'
+    };
+  }
+
+  return null;
+}
+
+function getSummaryItems(entries) {
+  const totalsByTicket = new Map();
+
+  for (const entry of entries) {
+    totalsByTicket.set(entry.ticketId, (totalsByTicket.get(entry.ticketId) ?? 0) + entry.durationMs);
+  }
+
+  return Array.from(totalsByTicket.entries())
+    .map(([ticketId, durationMs]) => ({ ticketId, durationMs }))
+    .sort((left, right) => right.durationMs - left.durationMs);
+}
+
+function showToast(message) {
+  clearTimeout(uiState.toastTimeoutId);
+  dom.toast.textContent = message;
+  dom.toast.classList.add('visible');
+  uiState.toastTimeoutId = window.setTimeout(() => {
+    dom.toast.classList.remove('visible');
+  }, 2800);
+}
+
+async function requestJson(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {})
+    }
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(payload?.message ?? 'Request failed.');
+  }
+
+  return payload;
+}
+
+async function refreshState() {
+  try {
+    uiState.trackerState = await requestJson('/state');
+    uiState.connectionError = null;
+    render();
+  } catch (error) {
+    uiState.connectionError = error.message;
+    render();
+    showToast(error.message);
+  }
+}
+
+async function submitAction(path, payload, successMessage) {
+  try {
+    uiState.trackerState = await requestJson(path, {
+      method: 'POST',
+      body: payload ? JSON.stringify(payload) : '{}'
+    });
+    uiState.connectionError = null;
+    render();
+    if (successMessage) {
+      showToast(successMessage);
+    }
+  } catch (error) {
+    uiState.connectionError = error.message;
+    render();
+    showToast(error.message);
+  }
+}
+
+function buildTicketActionPath(ticketId) {
+  if (uiState.trackerState?.activeEntry?.ticketId === ticketId) {
+    return null;
+  }
+
+  return uiState.trackerState?.activeEntry ? '/switch' : '/start';
+}
+
+async function startOrSwitch() {
+  const ticketId = dom.ticketInput.value.trim();
+
+  if (!ticketId) {
+    showToast('Enter a ticket first.');
+    dom.ticketInput.focus();
+    return;
+  }
+
+  const path = buildTicketActionPath(ticketId);
+
+  if (!path) {
+    showToast(`Already tracking ${ticketId}.`);
+    return;
+  }
+
+  await submitAction(path, { ticketId }, path === '/switch' ? `Switched to ${ticketId}.` : `Started ${ticketId}.`);
+  dom.ticketInput.value = '';
+  dom.ticketInput.focus();
+}
+
+function setStatusBadge(element, label, tone) {
+  element.className = `status-badge ${tone}`;
+  element.textContent = label;
+}
+
+function renderCurrentSession(viewModel) {
+  dom.currentSession.textContent = '';
+
+  if (!viewModel) {
+    dom.currentSession.className = 'current-session-card empty-state';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'No active ticket.';
+    dom.currentSession.append(paragraph);
+    return;
+  }
+
+  dom.currentSession.className = 'current-session-card';
+
+  const ticketDisplay = document.createElement('p');
+  ticketDisplay.className = 'ticket-display';
+  ticketDisplay.textContent = viewModel.ticketId;
+
+  const metadata = document.createElement('div');
+  metadata.className = 'session-metadata';
+
+  const startedItem = document.createElement('div');
+  startedItem.className = 'meta-item';
+  startedItem.innerHTML = `<span class="meta-label">Started</span><span class="meta-value">${formatTime(viewModel.startAt)}</span>`;
+
+  const durationItem = document.createElement('div');
+  durationItem.className = 'meta-item';
+  durationItem.innerHTML = `<span class="meta-label">Duration</span><span class="meta-value">${formatClockDuration(viewModel.durationMs)}</span>`;
+
+  const statusItem = document.createElement('div');
+  statusItem.className = 'meta-item';
+  statusItem.innerHTML = `<span class="meta-label">Status</span><span class="meta-value">${viewModel.statusLabel}</span>`;
+
+  metadata.append(startedItem, durationItem, statusItem);
+  dom.currentSession.append(ticketDisplay, metadata);
+}
+
+function renderSessionLog(entries) {
+  dom.sessionLog.textContent = '';
+
+  if (entries.length === 0) {
+    dom.sessionLog.className = 'session-log empty-state';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'No sessions yet today.';
+    dom.sessionLog.append(paragraph);
+    return;
+  }
+
+  dom.sessionLog.className = 'session-log';
+  const groups = new Map();
+
+  for (const entry of entries) {
+    if (!groups.has(entry.ticketId)) {
+      groups.set(entry.ticketId, []);
+    }
+
+    groups.get(entry.ticketId).push(entry);
+  }
+
+  for (const [ticketId, ticketEntries] of groups.entries()) {
+    const group = document.createElement('section');
+    group.className = 'ticket-group';
+
+    const title = document.createElement('h3');
+    title.className = 'ticket-group-title';
+    title.textContent = ticketId;
+    group.append(title);
+
+    for (const entry of ticketEntries) {
+      const row = document.createElement('div');
+      row.className = 'session-row';
+
+      const left = document.createElement('div');
+      const range = document.createElement('div');
+      range.className = 'session-range';
+      range.textContent = `${formatTime(entry.startAt)} → ${entry.isActive ? 'Now' : formatTime(entry.endAt)}`;
+      left.append(range);
+
+      const subtext = document.createElement('div');
+      subtext.className = 'session-subtext';
+      subtext.textContent = entry.isActive ? 'Working' : 'Completed';
+      left.append(subtext);
+
+      const right = document.createElement('strong');
+      right.textContent = formatHumanDuration(entry.durationMs);
+
+      row.append(left, right);
+      group.append(row);
+    }
+
+    dom.sessionLog.append(group);
+  }
+}
+
+function renderSummary(entries) {
+  dom.summaryPanel.textContent = '';
+
+  if (entries.length === 0) {
+    dom.summaryPanel.className = 'summary-grid empty-state';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'No tracked time today.';
+    dom.summaryPanel.append(paragraph);
+    return;
+  }
+
+  dom.summaryPanel.className = 'summary-grid';
+  const totals = getSummaryItems(entries);
+  const totalDurationMs = totals.reduce((sum, item) => sum + item.durationMs, 0);
+
+  const hero = document.createElement('div');
+  hero.className = 'summary-hero';
+  hero.innerHTML = `<span class="summary-label">Total time today</span><p class="summary-total">${formatHumanDuration(totalDurationMs)}</p>`;
+
+  const list = document.createElement('div');
+  list.className = 'summary-list';
+
+  for (const item of totals) {
+    const row = document.createElement('div');
+    row.className = 'summary-item';
+
+    const label = document.createElement('strong');
+    label.textContent = item.ticketId;
+
+    const value = document.createElement('span');
+    value.textContent = formatHumanDuration(item.durationMs);
+
+    row.append(label, value);
+    list.append(row);
+  }
+
+  dom.summaryPanel.append(hero, list);
+}
+
+function render() {
+  const now = new Date();
+  const entries = getTodayEntries(uiState.trackerState, now);
+  const dashboardStatus = getDashboardStatus(uiState.trackerState, entries);
+  const currentView = getCurrentSessionViewModel(uiState.trackerState, entries);
+  const headerDurationMs = currentView ? currentView.durationMs : 0;
+
+  setStatusBadge(dom.statusBadge, dashboardStatus.label, dashboardStatus.tone);
+  setStatusBadge(dom.currentSessionBadge, currentView?.statusLabel ?? dashboardStatus.label, currentView?.tone ?? dashboardStatus.tone);
+  dom.statusNote.textContent = uiState.connectionError ?? dashboardStatus.note;
+  dom.headerTimer.textContent = formatClockDuration(headerDurationMs);
+  dom.pauseButton.disabled = !uiState.trackerState?.activeEntry;
+  dom.punchOutButton.disabled = !uiState.trackerState?.activeEntry;
+
+  renderCurrentSession(currentView);
+  renderSessionLog(entries);
+  renderSummary(entries);
+}
+
+dom.startSwitchButton.addEventListener('click', () => {
+  startOrSwitch();
+});
+
+dom.punchInButton.addEventListener('click', () => {
+  startOrSwitch();
+});
+
+dom.pauseButton.addEventListener('click', () => {
+  submitAction('/pause', null, 'Paused current session.');
+});
+
+dom.punchOutButton.addEventListener('click', () => {
+  submitAction('/punch-out', null, 'Punched out.');
+});
+
+dom.ticketInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    startOrSwitch();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === '/' && document.activeElement !== dom.ticketInput) {
+    event.preventDefault();
+    dom.ticketInput.focus();
+  }
+});
+
+window.setInterval(() => {
+  render();
+}, 1000);
+
+window.setInterval(() => {
+  refreshState();
+}, 30000);
+
+refreshState();

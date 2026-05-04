@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Time Tracker Dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <header class="panel hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Local Time Tracker</p>
+          <h1>Track one ticket without losing your place.</h1>
+          <p id="status-note" class="hero-note">Loading current tracker state...</p>
+        </div>
+        <div class="hero-metrics">
+          <span id="status-badge" class="status-badge idle">Not started</span>
+          <div class="timer-block">
+            <p class="timer-label">Session timer</p>
+            <p id="header-timer" class="timer-value">00:00:00</p>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <button id="punch-in-button" class="button button-primary" type="button">Punch In</button>
+          <button id="punch-out-button" class="button button-secondary" type="button">Punch Out</button>
+        </div>
+      </header>
+
+      <section class="panel command-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Primary Action</p>
+            <h2>Start or switch by typing a ticket.</h2>
+          </div>
+          <p class="section-copy">Press Enter to keep this as fast as the CLI.</p>
+        </div>
+        <div class="command-row">
+          <label class="ticket-field" for="ticket-input">
+            <span class="field-label">Ticket</span>
+            <input id="ticket-input" type="text" placeholder="Enter ticket (e.g. ABC-123)" autocomplete="off" spellcheck="false">
+          </label>
+          <button id="start-switch-button" class="button button-primary" type="button">Start / Switch</button>
+          <button id="pause-button" class="button button-secondary" type="button">Pause</button>
+        </div>
+      </section>
+
+      <section class="panel current-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Current Session</p>
+            <h2>Focus stays visible at a glance.</h2>
+          </div>
+          <span id="current-session-badge" class="status-badge idle">Not started</span>
+        </div>
+        <div id="current-session" class="current-session-card empty-state">
+          <p>No active ticket.</p>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Today</p>
+            <h2>Session log</h2>
+          </div>
+          <p class="section-copy">Grouped chronologically by ticket.</p>
+        </div>
+        <div id="session-log" class="session-log empty-state">
+          <p>No sessions yet today.</p>
+        </div>
+      </section>
+
+      <section class="panel summary-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Summary</p>
+            <h2>Today&apos;s totals</h2>
+          </div>
+        </div>
+        <div id="summary-panel" class="summary-grid empty-state">
+          <p>No tracked time today.</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>

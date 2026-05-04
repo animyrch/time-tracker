@@ -1,7 +1,7 @@
 const path = require('node:path');
 
 const { buildReport, getActiveStatus, getSyncSummary } = require('../domain/report');
-const { createJiraClient } = require('../integrations/jira/client');
+const { createWorklogSyncFromEnvironment } = require('../integrations/jira/worklog-sync');
 const { createFileStateStore } = require('../storage/file-state-store');
 const { createTracker } = require('../tracker');
 
@@ -39,21 +39,6 @@ function createUsageText() {
     '  status',
     '  report'
   ].join('\n');
-}
-
-function createWorklogSyncFromEnvironment(env) {
-  const client = createJiraClient({
-    baseUrl: env.JIRA_BASE_URL,
-    email: env.JIRA_EMAIL,
-    apiToken: env.JIRA_API_TOKEN
-  });
-
-  return {
-    isConfigured: client.isConfigured,
-    async sendSession(session) {
-      await client.sendWorklog(session);
-    }
-  };
 }
 
 async function runCli(args, {
