@@ -19,6 +19,14 @@ function getDurationInMilliseconds(startAt, endAt) {
   return endMs - startMs;
 }
 
+function getDurationInSeconds(startAt, endAt) {
+  return Math.floor(getDurationInMilliseconds(startAt, endAt) / 1000);
+}
+
+function buildSessionId(session) {
+  return `${session.ticketId}:${session.startAt}:${session.endAt}`;
+}
+
 function createSession({ ticketId, startAt, endAt }) {
   return {
     ticketId,
@@ -29,6 +37,8 @@ function createSession({ ticketId, startAt, endAt }) {
 }
 
 module.exports = {
+  buildSessionId,
   createSession,
-  getDurationInMilliseconds
+  getDurationInMilliseconds,
+  getDurationInSeconds
 };

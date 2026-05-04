@@ -11,12 +11,14 @@ async function createTempFilePath() {
   return path.join(tempDirectory, 'state.json');
 }
 
-async function invokeCli(args, { filePath, now }) {
+async function invokeCli(args, { filePath, now, worklogSync, env }) {
   const stdout = [];
   const stderr = [];
   const exitCode = await runCli(args, {
     dataFilePath: filePath,
     now: () => now,
+    worklogSync,
+    env,
     stdout: (message) => stdout.push(message),
     stderr: (message) => stderr.push(message)
   });
@@ -46,6 +48,8 @@ test('start creates an active ticket and status shows ticket details', async () 
   assert.match(statusResult.stdout, /Current ticket: PROJ-1/);
   assert.match(statusResult.stdout, /Start time: 2026-05-04T09:00:00.000Z/);
   assert.match(statusResult.stdout, /Elapsed: 30m/);
+  assert.match(statusResult.stdout, /Jira sync: disabled/);
+  assert.match(statusResult.stdout, /Unsynced sessions: 0/);
 });
 
 test('switch closes the previous session and report shows aggregated totals', async () => {
@@ -68,6 +72,9 @@ test('switch closes the previous session and report shows aggregated totals', as
   assert.match(reportResult.stdout, /PROJ-1: 30m/);
   assert.match(reportResult.stdout, /PROJ-2: 15m/);
   assert.match(reportResult.stdout, /Total: 45m/);
+  assert.match(reportResult.stdout, /Synced: 0m/);
+  assert.match(reportResult.stdout, /Unsynced: 30m/);
+  assert.match(reportResult.stdout, /Unsynced sessions: 1/);
 });
 
 test('punch-in is accepted as an alias for start', async () => {
@@ -104,6 +111,61 @@ test('punch-out while idle succeeds with a readable message', async () => {
 
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, /No active ticket to punch out/);
+});
+
+test('sync retries unsynced sessions and clears the queue', async () => {
+  const filePath = await createTempFilePath();
+  let shouldFail = true;
+  const worklogSync = {
+    isConfigured: true,
+    async sendSession() {
+      if (shouldFail) {
+        throw new Error('Temporary Jira outage');
+      }
+    }
+  };
+
+  await invokeCli(['start', 'PROJ-10'], {
+    filePath,
+    now: '2026-05-04T15:00:00.000Z',
+    worklogSync
+  });
+  await invokeCli(['pause'], {
+    filePath,
+    now: '2026-05-04T15:25:00.000Z',
+    worklogSync
+  });
+  shouldFail = false;
+
+  const syncResult = await invokeCli(['sync'], {
+    filePath,
+    now: '2026-05-04T15:30:00.000Z',
+    worklogSync
+  });
+  const reportResult = await invokeCli(['report'], {
+    filePath,
+    now: '2026-05-04T15:30:00.000Z',
+    worklogSync
+  });
+
+  assert.equal(syncResult.exitCode, 0);
+  assert.match(syncResult.stdout, /Synced 1 session/);
+  assert.match(syncResult.stdout, /Remaining unsynced sessions: 0/);
+  assert.match(reportResult.stdout, /Synced: 25m/);
+  assert.match(reportResult.stdout, /Unsynced: 0m/);
+});
+
+test('sync reports missing Jira configuration', async () => {
+  const filePath = await createTempFilePath();
+
+  const result = await invokeCli(['sync'], {
+    filePath,
+    now: '2026-05-04T16:00:00.000Z',
+    env: {}
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr, /Jira sync is not configured/);
 });
 
 test('unknown commands exit with an error and usage help', async () => {

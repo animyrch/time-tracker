@@ -1,6 +1,7 @@
 const path = require('node:path');
 
-const { buildReport, getActiveStatus } = require('../domain/report');
+const { buildReport, getActiveStatus, getSyncSummary } = require('../domain/report');
+const { createJiraClient } = require('../integrations/jira/client');
 const { createFileStateStore } = require('../storage/file-state-store');
 const { createTracker } = require('../tracker');
 
@@ -34,19 +35,37 @@ function createUsageText() {
     '  switch <ticket>',
     '  pause',
     '  punch-out',
+    '  sync',
     '  status',
     '  report'
   ].join('\n');
 }
 
+function createWorklogSyncFromEnvironment(env) {
+  const client = createJiraClient({
+    baseUrl: env.JIRA_BASE_URL,
+    email: env.JIRA_EMAIL,
+    apiToken: env.JIRA_API_TOKEN
+  });
+
+  return {
+    isConfigured: client.isConfigured,
+    async sendSession(session) {
+      await client.sendWorklog(session);
+    }
+  };
+}
+
 async function runCli(args, {
   dataFilePath = path.resolve(process.cwd(), 'data', 'tracker-state.json'),
   now = () => new Date().toISOString(),
+  env = process.env,
+  worklogSync = createWorklogSyncFromEnvironment(env),
   stdout = (message) => console.log(message),
   stderr = (message) => console.error(message)
 } = {}) {
   const store = createFileStateStore({ filePath: dataFilePath });
-  const tracker = createTracker({ store, now });
+  const tracker = createTracker({ store, now, worklogSync });
   const [command, ...rest] = args;
 
   if (!command) {
@@ -111,15 +130,42 @@ async function runCli(args, {
   if (command === 'status') {
     const state = await tracker.getState();
     const activeStatus = getActiveStatus(state, now());
+    const syncSummary = getSyncSummary(state);
 
-    if (!activeStatus) {
+    if (activeStatus) {
+      stdout(`Current ticket: ${activeStatus.ticketId}`);
+      stdout(`Start time: ${activeStatus.startAt}`);
+      stdout(`Elapsed: ${formatDuration(activeStatus.elapsedMs)}`);
+    } else {
       stdout('No active ticket.');
+    }
+
+    stdout(`Jira sync: ${worklogSync.isConfigured ? 'enabled' : 'disabled'}`);
+    stdout(`Unsynced sessions: ${syncSummary.unsyncedSessionCount}`);
+    return 0;
+  }
+
+  if (command === 'sync') {
+    if (!worklogSync.isConfigured) {
+      stderr('Jira sync is not configured. Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN.');
+      return 1;
+    }
+
+    const beforeState = await tracker.getState();
+    const beforeSummary = getSyncSummary(beforeState);
+
+    if (beforeSummary.unsyncedSessionCount === 0) {
+      stdout('No unsynced sessions.');
+      stdout('Remaining unsynced sessions: 0');
       return 0;
     }
 
-    stdout(`Current ticket: ${activeStatus.ticketId}`);
-    stdout(`Start time: ${activeStatus.startAt}`);
-    stdout(`Elapsed: ${formatDuration(activeStatus.elapsedMs)}`);
+    const syncedState = await tracker.syncUnsyncedSessions();
+    const afterSummary = getSyncSummary(syncedState);
+    const syncedCount = beforeSummary.unsyncedSessionCount - afterSummary.unsyncedSessionCount;
+
+    stdout(`Synced ${syncedCount} session${syncedCount === 1 ? '' : 's'}.`);
+    stdout(`Remaining unsynced sessions: ${afterSummary.unsyncedSessionCount}`);
     return 0;
   }
 
@@ -130,6 +176,9 @@ async function runCli(args, {
     if (report.items.length === 0) {
       stdout('No tracked time.');
       stdout('Total: 0m');
+      stdout('Synced: 0m');
+      stdout('Unsynced: 0m');
+      stdout('Unsynced sessions: 0');
       return 0;
     }
 
@@ -140,6 +189,9 @@ async function runCli(args, {
     }
 
     stdout(`Total: ${formatDuration(report.totalDurationMs)}`);
+    stdout(`Synced: ${formatDuration(report.syncedDurationMs)}`);
+    stdout(`Unsynced: ${formatDuration(report.unsyncedDurationMs)}`);
+    stdout(`Unsynced sessions: ${report.unsyncedSessionCount}`);
     return 0;
   }
 
@@ -149,6 +201,7 @@ async function runCli(args, {
 }
 
 module.exports = {
+  createWorklogSyncFromEnvironment,
   formatDuration,
   runCli
 };

@@ -38,10 +38,14 @@ test('save preserves state data on disk', async () => {
     },
     sessions: [
       {
+        id: 'PROJ-1:2026-05-04T09:00:00.000Z:2026-05-04T10:00:00.000Z',
         ticketId: 'PROJ-1',
         startAt: '2026-05-04T09:00:00.000Z',
         endAt: '2026-05-04T10:00:00.000Z',
-        durationMs: 3600000
+        durationMs: 3600000,
+        durationSeconds: 3600,
+        synced: false,
+        syncError: null
       }
     ]
   };
@@ -50,4 +54,36 @@ test('save preserves state data on disk', async () => {
 
   const reloadedState = JSON.parse(await fs.readFile(filePath, 'utf8'));
   assert.deepEqual(reloadedState, state);
+});
+
+test('load normalizes legacy sessions into unsynced session records', async () => {
+  const filePath = await createTempFilePath();
+  await fs.writeFile(filePath, JSON.stringify({
+    status: 'idle',
+    activeEntry: null,
+    sessions: [
+      {
+        ticketId: 'PROJ-2',
+        startAt: '2026-05-04T10:00:00.000Z',
+        endAt: '2026-05-04T11:15:00.000Z',
+        durationMs: 4500000
+      }
+    ]
+  }, null, 2));
+  const store = createFileStateStore({ filePath });
+
+  const state = await store.load();
+
+  assert.deepEqual(state.sessions, [
+    {
+      id: 'PROJ-2:2026-05-04T10:00:00.000Z:2026-05-04T11:15:00.000Z',
+      ticketId: 'PROJ-2',
+      startAt: '2026-05-04T10:00:00.000Z',
+      endAt: '2026-05-04T11:15:00.000Z',
+      durationMs: 4500000,
+      durationSeconds: 4500,
+      synced: false,
+      syncError: null
+    }
+  ]);
 });

@@ -1,5 +1,24 @@
 const { getDurationInMilliseconds } = require('./session');
 
+function getSyncSummary(state) {
+  return state.sessions.reduce((summary, session) => {
+    if (session.synced) {
+      summary.syncedDurationMs += session.durationMs;
+      summary.syncedSessionCount += 1;
+    } else {
+      summary.unsyncedDurationMs += session.durationMs;
+      summary.unsyncedSessionCount += 1;
+    }
+
+    return summary;
+  }, {
+    syncedDurationMs: 0,
+    syncedSessionCount: 0,
+    unsyncedDurationMs: 0,
+    unsyncedSessionCount: 0
+  });
+}
+
 function getActiveStatus(state, now) {
   if (!state.activeEntry) {
     return null;
@@ -14,6 +33,7 @@ function getActiveStatus(state, now) {
 
 function buildReport(state, now) {
   const totalsByTicket = new Map();
+  const syncSummary = getSyncSummary(state);
 
   for (const session of state.sessions) {
     totalsByTicket.set(
@@ -39,11 +59,13 @@ function buildReport(state, now) {
 
   return {
     items,
-    totalDurationMs
+    totalDurationMs,
+    ...syncSummary
   };
 }
 
 module.exports = {
   buildReport,
-  getActiveStatus
+  getActiveStatus,
+  getSyncSummary
 };
