@@ -1,5 +1,6 @@
 const { applyCommand } = require('./domain/state-machine');
 const { buildSessionId, getDurationInSeconds } = require('./domain/session');
+const { normalizeTicketId } = require('./domain/ticket-id');
 
 function createNoopWorklogSync() {
   return {
@@ -93,8 +94,22 @@ function createTracker({
 
   async function runCommand(command) {
     const currentState = await store.load();
+    const normalizedCommand = command.ticketId
+      ? {
+          ...command,
+          ticketId: normalizeTicketId(command.ticketId)
+        }
+      : command;
+
+    if (
+      normalizedCommand.ticketId &&
+      currentState.activeEntry?.ticketId === normalizedCommand.ticketId
+    ) {
+      return currentState;
+    }
+
     const nextState = applyCommand(currentState, {
-      ...command,
+      ...normalizedCommand,
       at: now()
     });
     const completedSessionStartIndex = currentState.sessions.length;

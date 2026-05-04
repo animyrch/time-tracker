@@ -71,6 +71,51 @@ test('tracker restores an active session after reload', async () => {
   });
 });
 
+test('tracker normalizes Jira browse URLs into ticket IDs', async () => {
+  const filePath = await createTempFilePath();
+  const store = createFileStateStore({ filePath });
+  const tracker = createTracker({
+    store,
+    now: () => '2026-05-04T11:00:00.000Z'
+  });
+
+  const state = await tracker.start('https://expondo.atlassian.net/browse/COM-608');
+
+  assert.deepEqual(state, {
+    status: 'working',
+    activeEntry: {
+      ticketId: 'COM-608',
+      startAt: '2026-05-04T11:00:00.000Z'
+    },
+    sessions: []
+  });
+});
+
+test('tracker does not close and reopen the same normalized active ticket', async () => {
+  const filePath = await createTempFilePath();
+  const times = [
+    '2026-05-04T11:00:00.000Z',
+    '2026-05-04T11:05:00.000Z'
+  ];
+  const store = createFileStateStore({ filePath });
+  const tracker = createTracker({
+    store,
+    now: () => times.shift()
+  });
+
+  await tracker.start('COM-608');
+  const state = await tracker.switch('https://expondo.atlassian.net/browse/COM-608');
+
+  assert.deepEqual(state, {
+    status: 'working',
+    activeEntry: {
+      ticketId: 'COM-608',
+      startAt: '2026-05-04T11:00:00.000Z'
+    },
+    sessions: []
+  });
+});
+
 test('tracker marks a completed session as synced when Jira worklog delivery succeeds', async () => {
   const filePath = await createTempFilePath();
   const sentSessions = [];

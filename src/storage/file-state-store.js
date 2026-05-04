@@ -7,21 +7,38 @@ const {
   getDurationInMilliseconds,
   getDurationInSeconds
 } = require('../domain/session');
+const { normalizeTicketId } = require('../domain/ticket-id');
 
-function normalizeSession(session) {
-  const durationMs = Number.isFinite(session?.durationMs)
-    ? session.durationMs
-    : getDurationInMilliseconds(session.startAt, session.endAt);
+function normalizeActiveEntry(activeEntry) {
+  if (!activeEntry) {
+    return null;
+  }
 
   return {
-    id: typeof session?.id === 'string' ? session.id : buildSessionId(session),
-    ticketId: session.ticketId,
-    startAt: session.startAt,
-    endAt: session.endAt,
+    ticketId: normalizeTicketId(activeEntry.ticketId),
+    startAt: activeEntry.startAt
+  };
+}
+
+function normalizeSession(session) {
+  const normalizedTicketId = normalizeTicketId(session.ticketId);
+  const normalizedSession = {
+    ...session,
+    ticketId: normalizedTicketId
+  };
+  const durationMs = Number.isFinite(session?.durationMs)
+    ? session.durationMs
+    : getDurationInMilliseconds(normalizedSession.startAt, normalizedSession.endAt);
+
+  return {
+    id: typeof session?.id === 'string' ? buildSessionId(normalizedSession) : buildSessionId(normalizedSession),
+    ticketId: normalizedSession.ticketId,
+    startAt: normalizedSession.startAt,
+    endAt: normalizedSession.endAt,
     durationMs,
     durationSeconds: Number.isFinite(session?.durationSeconds)
       ? session.durationSeconds
-      : getDurationInSeconds(session.startAt, session.endAt),
+      : getDurationInSeconds(normalizedSession.startAt, normalizedSession.endAt),
     synced: session?.synced === true,
     syncError: typeof session?.syncError === 'string' ? session.syncError : null
   };
@@ -44,7 +61,7 @@ async function ensureStateFile(filePath) {
 function normalizeState(value) {
   return {
     status: value?.status === 'working' ? 'working' : 'idle',
-    activeEntry: value?.activeEntry ?? null,
+    activeEntry: normalizeActiveEntry(value?.activeEntry ?? null),
     sessions: Array.isArray(value?.sessions) ? value.sessions.map(normalizeSession) : []
   };
 }

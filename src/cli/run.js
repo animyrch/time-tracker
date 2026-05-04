@@ -67,8 +67,8 @@ async function runCli(args, {
       return 1;
     }
 
-    await tracker.start(ticketId);
-    stdout(`Started tracking ${ticketId}.`);
+    const nextState = await tracker.start(ticketId);
+    stdout(`Started tracking ${nextState.activeEntry.ticketId}.`);
     return 0;
   }
 
@@ -81,8 +81,8 @@ async function runCli(args, {
       return 1;
     }
 
-    await tracker.switch(ticketId);
-    stdout(`Switched to ${ticketId}.`);
+    const nextState = await tracker.switch(ticketId);
+    stdout(`Switched to ${nextState.activeEntry.ticketId}.`);
     return 0;
   }
 

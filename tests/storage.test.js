@@ -63,7 +63,7 @@ test('load normalizes legacy sessions into unsynced session records', async () =
     activeEntry: null,
     sessions: [
       {
-        ticketId: 'PROJ-2',
+        ticketId: 'https://expondo.atlassian.net/browse/com-608',
         startAt: '2026-05-04T10:00:00.000Z',
         endAt: '2026-05-04T11:15:00.000Z',
         durationMs: 4500000
@@ -76,8 +76,8 @@ test('load normalizes legacy sessions into unsynced session records', async () =
 
   assert.deepEqual(state.sessions, [
     {
-      id: 'PROJ-2:2026-05-04T10:00:00.000Z:2026-05-04T11:15:00.000Z',
-      ticketId: 'PROJ-2',
+      id: 'COM-608:2026-05-04T10:00:00.000Z:2026-05-04T11:15:00.000Z',
+      ticketId: 'COM-608',
       startAt: '2026-05-04T10:00:00.000Z',
       endAt: '2026-05-04T11:15:00.000Z',
       durationMs: 4500000,
@@ -86,4 +86,24 @@ test('load normalizes legacy sessions into unsynced session records', async () =
       syncError: null
     }
   ]);
+});
+
+test('load normalizes a persisted active entry into a ticket ID', async () => {
+  const filePath = await createTempFilePath();
+  await fs.writeFile(filePath, JSON.stringify({
+    status: 'working',
+    activeEntry: {
+      ticketId: 'https://expondo.atlassian.net/browse/com-609',
+      startAt: '2026-05-04T12:00:00.000Z'
+    },
+    sessions: []
+  }, null, 2));
+  const store = createFileStateStore({ filePath });
+
+  const state = await store.load();
+
+  assert.deepEqual(state.activeEntry, {
+    ticketId: 'COM-609',
+    startAt: '2026-05-04T12:00:00.000Z'
+  });
 });

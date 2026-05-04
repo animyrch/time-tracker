@@ -60,6 +60,19 @@ function formatTime(timestamp) {
   }).format(new Date(timestamp));
 }
 
+function normalizeTicketId(value) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return '';
+  }
+
+  const browseMatch = trimmedValue.match(/(?:^https?:\/\/[^/]+)?\/?browse\/([^/?#]+)/i);
+  const normalizedValue = browseMatch ? browseMatch[1] : trimmedValue;
+
+  return normalizedValue.trim().replace(/\/+$/g, '').toUpperCase();
+}
+
 function getLocalDayKey(date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
@@ -274,7 +287,7 @@ function buildTicketActionPath(ticketId) {
 }
 
 async function startOrSwitch() {
-  const ticketId = dom.ticketInput.value.trim();
+  const ticketId = normalizeTicketId(dom.ticketInput.value);
 
   if (!ticketId) {
     showToast('Enter a ticket first.');

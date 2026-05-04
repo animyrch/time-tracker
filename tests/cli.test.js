@@ -89,6 +89,24 @@ test('punch-in is accepted as an alias for start', async () => {
   assert.match(result.stdout, /Started tracking PROJ-9/);
 });
 
+test('CLI normalizes Jira browse URLs before tracking', async () => {
+  const filePath = await createTempFilePath();
+
+  const startResult = await invokeCli(['start', 'https://expondo.atlassian.net/browse/COM-608'], {
+    filePath,
+    now: '2026-05-04T12:00:00.000Z'
+  });
+  const statusResult = await invokeCli(['status'], {
+    filePath,
+    now: '2026-05-04T12:05:00.000Z'
+  });
+
+  assert.equal(startResult.exitCode, 0);
+  assert.match(startResult.stdout, /Started tracking COM-608/);
+  assert.equal(statusResult.exitCode, 0);
+  assert.match(statusResult.stdout, /Current ticket: COM-608/);
+});
+
 test('pause while idle succeeds with a readable message', async () => {
   const filePath = await createTempFilePath();
 
