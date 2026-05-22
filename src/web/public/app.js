@@ -189,6 +189,39 @@ function getSummaryItems(entries) {
     .sort((left, right) => right.durationMs - left.durationMs);
 }
 
+function getTicketSummary(ticketId) {
+  const summary = uiState.trackerState?.ticketDetails?.[ticketId]?.summary;
+
+  if (typeof summary !== 'string') {
+    return null;
+  }
+
+  const trimmedSummary = summary.trim();
+
+  return trimmedSummary.length > 0 ? trimmedSummary : null;
+}
+
+function createTicketLabel(ticketId, variant = 'inline') {
+  const label = document.createElement('span');
+  label.className = `ticket-label ${variant}`;
+
+  const key = document.createElement('span');
+  key.className = 'ticket-key';
+  key.textContent = ticketId;
+  label.append(key);
+
+  const summary = getTicketSummary(ticketId);
+
+  if (summary) {
+    const summaryText = document.createElement('span');
+    summaryText.className = 'ticket-summary';
+    summaryText.textContent = summary;
+    label.append(summaryText);
+  }
+
+  return label;
+}
+
 function renderRecapSummary(entries) {
   dom.yesterdaySummary.textContent = '';
 
@@ -206,7 +239,15 @@ function renderRecapSummary(entries) {
 
   const hero = document.createElement('div');
   hero.className = 'recap-total';
-  hero.innerHTML = `<span class="summary-label">Yesterday total</span><strong>${formatHumanDuration(totalDurationMs)}</strong>`;
+
+  const heroLabel = document.createElement('span');
+  heroLabel.className = 'summary-label';
+  heroLabel.textContent = 'Yesterday total';
+
+  const heroValue = document.createElement('strong');
+  heroValue.textContent = formatHumanDuration(totalDurationMs);
+
+  hero.append(heroLabel, heroValue);
 
   const chips = document.createElement('div');
   chips.className = 'recap-chips';
@@ -214,7 +255,12 @@ function renderRecapSummary(entries) {
   for (const item of totals) {
     const chip = document.createElement('div');
     chip.className = 'recap-chip';
-    chip.innerHTML = `<strong>${item.ticketId}</strong><span>${formatHumanDuration(item.durationMs)}</span>`;
+
+    const duration = document.createElement('span');
+    duration.className = 'ticket-duration';
+    duration.textContent = formatHumanDuration(item.durationMs);
+
+    chip.append(createTicketLabel(item.ticketId, 'stacked'), duration);
     chips.append(chip);
   }
 
@@ -325,9 +371,9 @@ function renderCurrentSession(viewModel) {
 
   dom.currentSession.className = 'current-session-card';
 
-  const ticketDisplay = document.createElement('p');
+  const ticketDisplay = document.createElement('div');
   ticketDisplay.className = 'ticket-display';
-  ticketDisplay.textContent = viewModel.ticketId;
+  ticketDisplay.append(createTicketLabel(viewModel.ticketId, 'stacked'));
 
   const metadata = document.createElement('div');
   metadata.className = 'session-metadata';
@@ -376,7 +422,7 @@ function renderSessionLog(entries) {
 
     const title = document.createElement('h3');
     title.className = 'ticket-group-title';
-    title.textContent = ticketId;
+    title.append(createTicketLabel(ticketId, 'stacked'));
     group.append(title);
 
     for (const entry of ticketEntries) {
@@ -433,7 +479,7 @@ function renderYesterdayLog(entries) {
 
     const title = document.createElement('h3');
     title.className = 'ticket-group-title';
-    title.textContent = ticketId;
+    title.append(createTicketLabel(ticketId, 'stacked'));
     group.append(title);
 
     for (const entry of ticketEntries) {
@@ -488,10 +534,10 @@ function renderSummary(entries) {
     const row = document.createElement('div');
     row.className = 'summary-item';
 
-    const label = document.createElement('strong');
-    label.textContent = item.ticketId;
+    const label = createTicketLabel(item.ticketId, 'inline');
 
     const value = document.createElement('span');
+    value.className = 'summary-duration';
     value.textContent = formatHumanDuration(item.durationMs);
 
     row.append(label, value);

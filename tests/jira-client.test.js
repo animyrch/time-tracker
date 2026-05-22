@@ -59,6 +59,36 @@ test('createJiraClient posts worklogs with the correct endpoint, headers, and pa
   });
 });
 
+test('createJiraClient fetches issue summaries', async () => {
+  const calls = [];
+  const client = createJiraClient({
+    baseUrl: 'https://example.atlassian.net',
+    email: 'dev@example.com',
+    apiToken: 'secret-token',
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return JSON.stringify({
+            fields: {
+              summary: 'Show ticket summaries in the dashboard'
+            }
+          });
+        }
+      };
+    }
+  });
+
+  const summary = await client.getIssueSummary('PROJ-7');
+
+  assert.equal(summary, 'Show ticket summaries in the dashboard');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://example.atlassian.net/rest/api/3/issue/PROJ-7?fields=summary');
+  assert.equal(calls[0].options.method, 'GET');
+});
+
 test('createJiraClient surfaces Jira API failures', async () => {
   const client = createJiraClient({
     baseUrl: 'https://example.atlassian.net',

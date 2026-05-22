@@ -1,3 +1,46 @@
+test('tracker normalizes ticket input: number, key, and URL', async () => {
+  const filePath = await createTempFilePath();
+  const store = createFileStateStore({ filePath });
+  const tracker = createTracker({
+    store,
+    now: () => '2026-05-04T12:00:00.000Z'
+  });
+
+  // Number only
+  let state = await tracker.start('646');
+  assert.deepEqual(state, {
+    status: 'working',
+    activeEntry: {
+      ticketId: 'COM-646',
+      startAt: '2026-05-04T12:00:00.000Z'
+    },
+    sessions: []
+  });
+
+  // Key format
+  await tracker.pause();
+  state = await tracker.start('COM-646');
+  assert.deepEqual(state, {
+    status: 'working',
+    activeEntry: {
+      ticketId: 'COM-646',
+      startAt: '2026-05-04T12:00:00.000Z'
+    },
+    sessions: []
+  });
+
+  // URL format
+  await tracker.pause();
+  state = await tracker.start('https://expondo.atlassian.net/browse/COM-646');
+  assert.deepEqual(state, {
+    status: 'working',
+    activeEntry: {
+      ticketId: 'COM-646',
+      startAt: '2026-05-04T12:00:00.000Z'
+    },
+    sessions: []
+  });
+});
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');

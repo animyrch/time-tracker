@@ -16,6 +16,10 @@ function parseErrorMessage(bodyText, status) {
   try {
     const parsed = JSON.parse(bodyText);
 
+    if (typeof parsed.errorMessage === 'string' && parsed.errorMessage.length > 0) {
+      return parsed.errorMessage;
+    }
+
     if (Array.isArray(parsed.errorMessages) && parsed.errorMessages.length > 0) {
       return parsed.errorMessages.join(', ');
     }
@@ -50,8 +54,9 @@ function createJiraClient({
       }
 
       const { issueKey, payload } = toJiraWorklog(session);
+      const url = `${normalizedBaseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog`;
       const response = await fetchImpl(
-        `${normalizedBaseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog`,
+        url,
         {
           method: 'POST',
           headers: {

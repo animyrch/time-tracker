@@ -1,17 +1,26 @@
+require('dotenv').config();
+
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { URL } = require('node:url');
 
+const { createJiraClient } = require('../integrations/jira/client');
 const { createWorklogSyncFromEnvironment } = require('../integrations/jira/worklog-sync');
 const { createFileStateStore } = require('../storage/file-state-store');
 const { createTracker } = require('../tracker');
 
 const publicDirectoryPath = path.resolve(__dirname, 'public');
 const dataFilePath = path.resolve(process.cwd(), 'data', 'tracker-state.json');
+const jiraClient = createJiraClient({
+  baseUrl: process.env.JIRA_BASE_URL,
+  email: process.env.JIRA_EMAIL,
+  apiToken: process.env.JIRA_API_TOKEN
+});
 const worklogSync = createWorklogSyncFromEnvironment(process.env);
 const store = createFileStateStore({ filePath: dataFilePath });
 const tracker = createTracker({ store, worklogSync });
+const ticketDetailCache = new Map();
 
 function resolvePort(value) {
   const parsed = Number.parseInt(value ?? '9999', 10);
@@ -23,11 +32,61 @@ function resolvePort(value) {
   return parsed;
 }
 
-function createStatePayload(state) {
+function getTrackedTicketIds(state) {
+  const ticketIds = new Set();
+
+  for (const session of state.sessions) {
+    ticketIds.add(session.ticketId);
+  }
+
+  if (state.activeEntry?.ticketId) {
+    ticketIds.add(state.activeEntry.ticketId);
+  }
+
+  return [...ticketIds];
+}
+
+async function loadTicketDetail(ticketId) {
+  if (!jiraClient.isConfigured) {
+    return null;
+  }
+
+  if (ticketDetailCache.has(ticketId)) {
+    return ticketDetailCache.get(ticketId);
+  }
+
+  const summary = await jiraClient.getIssueSummary(ticketId);
+  const detail = summary ? { summary } : null;
+
+  ticketDetailCache.set(ticketId, detail);
+
+  return detail;
+}
+
+async function buildTicketDetails(state) {
+  if (!jiraClient.isConfigured) {
+    return {};
+  }
+
+  const entries = await Promise.all(
+    getTrackedTicketIds(state).map(async (ticketId) => {
+      try {
+        return [ticketId, await loadTicketDetail(ticketId)];
+      } catch (error) {
+        return [ticketId, null];
+      }
+    })
+  );
+
+  return Object.fromEntries(entries.filter(([, detail]) => detail));
+}
+
+async function createStatePayload(state) {
   return {
     ...state,
     serverNow: new Date().toISOString(),
-    syncEnabled: worklogSync.isConfigured
+    syncEnabled: worklogSync.isConfigured,
+    ticketDetails: await buildTicketDetails(state)
   };
 }
 
@@ -108,7 +167,7 @@ async function handleAction(request, response, action) {
     return;
   }
 
-  sendJson(response, 200, createStatePayload(nextState));
+  sendJson(response, 200, await createStatePayload(nextState));
 }
 
 async function handleRequest(request, response) {
@@ -131,7 +190,7 @@ async function handleRequest(request, response) {
 
   if (request.method === 'GET' && url.pathname === '/state') {
     const state = await tracker.getState();
-    sendJson(response, 200, createStatePayload(state));
+    sendJson(response, 200, await createStatePayload(state));
     return;
   }
 
