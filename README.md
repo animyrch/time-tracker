@@ -1,13 +1,13 @@
 # Time Tracker
 
-Minimal local time tracking for ticket-based work. The project is built in Node.js, stores state in JSON on disk, exposes a CLI for fast workflows, and includes a small single-page web UI on top of the same tracker core.
+Minimal local time tracking for ticket-based work. The project is built in Node.js, stores state in JSON on disk, and includes a small single-page web UI on top of the tracker core.
 
 ## What It Does
 
 - Tracks one active ticket at a time.
 - Supports `start`, `switch`, and `pause` flows.
 - Persists sessions locally in `data/tracker-state.json`.
-- Shows human-readable status and reports in the terminal.
+- Shows human-readable status and reports in the web UI.
 - Optionally syncs completed sessions to Jira worklogs.
 - Exposes a lightweight web dashboard over the same backend logic.
 
@@ -23,34 +23,7 @@ npm install
 npm test
 ```
 
-## CLI Usage
-
-Run commands through npm:
-
-```bash
-npm run cli -- status
-```
-
-Available commands:
-
-- `npm run cli -- start <ticket>`
-- `npm run cli -- switch <ticket>`
-- `npm run cli -- pause`
-- `npm run cli -- sync`
-- `npm run cli -- status`
-- `npm run cli -- report`
-- `npm run cli -- sync`
-- `npm run cli -- status`
-- `npm run cli -- report`
-
-Examples:
-
-```bash
-npm run cli -- start PROJ-123
-npm run cli -- switch PROJ-456
-npm run cli -- pause
-npm run cli -- report
-```
+<!-- CLI removed: the project now exposes only the web UI -->
 
 ## Web UI
 
@@ -94,11 +67,11 @@ JIRA_BASE_URL="https://your-domain.atlassian.net"
 JIRA_API_TOKEN="your-scoped-token"
 ```
 
-Notes:
+- Notes:
 
 - Jira sync only runs when those variables are present.
 - Failed Jira sends do not lose local sessions.
-- Unsynced sessions remain in local state and can be retried with `npm run cli -- sync`.
+- Unsynced sessions remain in local state and can be retried from the web UI controls.
 - The project includes `.env.example` as a reference, but the app does not load env files automatically.
 
 ## Storage
@@ -133,7 +106,7 @@ The test suite covers:
 - State transitions
 - File persistence
 - Tracker orchestration
-- CLI behavior
+- (CLI removed; behavior covered via unit tests of the tracker core)
 - Jira adapter and client mapping
 
 ## Project Layout
@@ -142,7 +115,7 @@ The test suite covers:
 .
 ├── data/
 ├── src/
-│   ├── cli/
+│   ├── web/
 │   ├── domain/
 │   ├── integrations/
 │   │   └── jira/

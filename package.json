@@ -2,12 +2,9 @@
   "name": "time-tracker",
   "version": "1.0.0",
   "private": true,
-  "description": "CLI time tracking for local ticket work.",
-  "bin": {
-    "time-tracker": "./src/index.js"
-  },
+  "description": "Local time tracking with a web UI for ticket-based work.",
   "scripts": {
-    "cli": "node src/index.js",
+    "start": "node src/web/server.js",
     "web": "node src/web/server.js",
     "test": "node --test"
   },
