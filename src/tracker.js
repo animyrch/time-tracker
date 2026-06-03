@@ -145,9 +145,6 @@ function createTracker({
       return runCommand({ type: 'pause' });
     },
 
-    async punchOut() {
-      return runCommand({ type: 'punchOut' });
-    },
 
     async syncUnsyncedSessions() {
       const state = await store.load();

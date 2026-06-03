@@ -77,17 +77,7 @@ test('switch closes the previous session and report shows aggregated totals', as
   assert.match(reportResult.stdout, /Unsynced sessions: 1/);
 });
 
-test('punch-in is accepted as an alias for start', async () => {
-  const filePath = await createTempFilePath();
 
-  const result = await invokeCli(['punch-in', 'PROJ-9'], {
-    filePath,
-    now: '2026-05-04T12:00:00.000Z'
-  });
-
-  assert.equal(result.exitCode, 0);
-  assert.match(result.stdout, /Started tracking PROJ-9/);
-});
 
 test('CLI normalizes Jira browse URLs before tracking', async () => {
   const filePath = await createTempFilePath();
@@ -119,17 +109,7 @@ test('pause while idle succeeds with a readable message', async () => {
   assert.match(result.stdout, /No active ticket to pause/);
 });
 
-test('punch-out while idle succeeds with a readable message', async () => {
-  const filePath = await createTempFilePath();
 
-  const result = await invokeCli(['punch-out'], {
-    filePath,
-    now: '2026-05-04T12:00:00.000Z'
-  });
-
-  assert.equal(result.exitCode, 0);
-  assert.match(result.stdout, /No active ticket to punch out/);
-});
 
 test('sync retries unsynced sessions and clears the queue', async () => {
   const filePath = await createTempFilePath();

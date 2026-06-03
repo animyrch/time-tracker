@@ -5,7 +5,7 @@ Minimal local time tracking for ticket-based work. The project is built in Node.
 ## What It Does
 
 - Tracks one active ticket at a time.
-- Supports `start`, `switch`, `pause`, and `punch-out` flows.
+- Supports `start`, `switch`, and `pause` flows.
 - Persists sessions locally in `data/tracker-state.json`.
 - Shows human-readable status and reports in the terminal.
 - Optionally syncs completed sessions to Jira worklogs.
@@ -33,11 +33,12 @@ npm run cli -- status
 
 Available commands:
 
-- `npm run cli -- punch-in <ticket>`
 - `npm run cli -- start <ticket>`
 - `npm run cli -- switch <ticket>`
 - `npm run cli -- pause`
-- `npm run cli -- punch-out`
+- `npm run cli -- sync`
+- `npm run cli -- status`
+- `npm run cli -- report`
 - `npm run cli -- sync`
 - `npm run cli -- status`
 - `npm run cli -- report`
@@ -75,7 +76,7 @@ The web UI is a thin layer over the existing tracker and exposes these backend r
 - `POST /start`
 - `POST /switch`
 - `POST /pause`
-- `POST /punch-out`
+
 
 ## Jira Sync
 

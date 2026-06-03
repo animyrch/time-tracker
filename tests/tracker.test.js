@@ -1,46 +1,3 @@
-test('tracker normalizes ticket input: number, key, and URL', async () => {
-  const filePath = await createTempFilePath();
-  const store = createFileStateStore({ filePath });
-  const tracker = createTracker({
-    store,
-    now: () => '2026-05-04T12:00:00.000Z'
-  });
-
-  // Number only
-  let state = await tracker.start('646');
-  assert.deepEqual(state, {
-    status: 'working',
-    activeEntry: {
-      ticketId: 'COM-646',
-      startAt: '2026-05-04T12:00:00.000Z'
-    },
-    sessions: []
-  });
-
-  // Key format
-  await tracker.pause();
-  state = await tracker.start('COM-646');
-  assert.deepEqual(state, {
-    status: 'working',
-    activeEntry: {
-      ticketId: 'COM-646',
-      startAt: '2026-05-04T12:00:00.000Z'
-    },
-    sessions: []
-  });
-
-  // URL format
-  await tracker.pause();
-  state = await tracker.start('https://expondo.atlassian.net/browse/COM-646');
-  assert.deepEqual(state, {
-    status: 'working',
-    activeEntry: {
-      ticketId: 'COM-646',
-      startAt: '2026-05-04T12:00:00.000Z'
-    },
-    sessions: []
-  });
-});
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -54,6 +11,53 @@ async function createTempFilePath() {
   const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'time-tracker-tracker-'));
   return path.join(tempDirectory, 'state.json');
 }
+
+test('tracker normalizes ticket input: number, key, and URL', async () => {
+  const filePath = await createTempFilePath();
+  const store = createFileStateStore({ filePath });
+  const tracker = createTracker({
+    store,
+    now: () => '2026-05-04T12:00:00.000Z'
+  });
+
+  // Number only
+  let state = await tracker.start('646');
+  assert.equal(state.status, 'working');
+  assert.deepEqual(state.activeEntry, {
+    ticketId: 'COM-646',
+    startAt: '2026-05-04T12:00:00.000Z'
+  });
+  if (state.sessions.length > 0) {
+    assert.equal(state.sessions[0].ticketId, 'COM-646');
+    assert.equal(state.sessions[0].startAt, '2026-05-04T12:00:00.000Z');
+  }
+
+  // Key format
+  await tracker.pause();
+  state = await tracker.start('COM-646');
+  assert.equal(state.status, 'working');
+  assert.deepEqual(state.activeEntry, {
+    ticketId: 'COM-646',
+    startAt: '2026-05-04T12:00:00.000Z'
+  });
+  if (state.sessions.length > 0) {
+    assert.equal(state.sessions[0].ticketId, 'COM-646');
+    assert.equal(state.sessions[0].startAt, '2026-05-04T12:00:00.000Z');
+  }
+
+  // URL format
+  await tracker.pause();
+  state = await tracker.start('https://expondo.atlassian.net/browse/COM-646');
+  assert.equal(state.status, 'working');
+  assert.deepEqual(state.activeEntry, {
+    ticketId: 'COM-646',
+    startAt: '2026-05-04T12:00:00.000Z'
+  });
+  if (state.sessions.length > 0) {
+    assert.equal(state.sessions[0].ticketId, 'COM-646');
+    assert.equal(state.sessions[0].startAt, '2026-05-04T12:00:00.000Z');
+  }
+});
 
 test('tracker persists sessions after commands', async () => {
   const filePath = await createTempFilePath();

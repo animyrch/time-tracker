@@ -8,8 +8,6 @@ const dom = {
   statusNote: document.querySelector('#status-note'),
   statusBadge: document.querySelector('#status-badge'),
   headerTimer: document.querySelector('#header-timer'),
-  punchInButton: document.querySelector('#punch-in-button'),
-  punchOutButton: document.querySelector('#punch-out-button'),
   ticketInput: document.querySelector('#ticket-input'),
   startSwitchButton: document.querySelector('#start-switch-button'),
   pauseButton: document.querySelector('#pause-button'),
@@ -560,7 +558,6 @@ function render() {
   dom.statusNote.textContent = uiState.connectionError ?? dashboardStatus.note;
   dom.headerTimer.textContent = formatClockDuration(headerDurationMs);
   dom.pauseButton.disabled = !uiState.trackerState?.activeEntry;
-  dom.punchOutButton.disabled = !uiState.trackerState?.activeEntry;
 
   renderCurrentSession(currentView);
   renderSessionLog(todayEntries);
@@ -573,16 +570,8 @@ dom.startSwitchButton.addEventListener('click', () => {
   startOrSwitch();
 });
 
-dom.punchInButton.addEventListener('click', () => {
-  startOrSwitch();
-});
-
 dom.pauseButton.addEventListener('click', () => {
   submitAction('/pause', null, 'Paused current session.');
-});
-
-dom.punchOutButton.addEventListener('click', () => {
-  submitAction('/punch-out', null, 'Punched out.');
 });
 
 dom.ticketInput.addEventListener('keydown', (event) => {

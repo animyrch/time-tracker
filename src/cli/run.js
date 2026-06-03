@@ -30,11 +30,9 @@ function formatDuration(durationMs) {
 function createUsageText() {
   return [
     'Available commands:',
-    '  punch-in <ticket>',
     '  start <ticket>',
     '  switch <ticket>',
     '  pause',
-    '  punch-out',
     '  sync',
     '  status',
     '  report'
@@ -58,7 +56,7 @@ async function runCli(args, {
     return 1;
   }
 
-  if (command === 'start' || command === 'punch-in') {
+  if (command === 'start') {
     const ticketId = rest[0];
 
     if (!ticketId) {
@@ -99,18 +97,6 @@ async function runCli(args, {
     return 0;
   }
 
-  if (command === 'punch-out') {
-    const state = await tracker.getState();
-
-    if (!state.activeEntry) {
-      stdout('No active ticket to punch out.');
-      return 0;
-    }
-
-    await tracker.punchOut();
-    stdout(`Punched out from ${state.activeEntry.ticketId}.`);
-    return 0;
-  }
 
   if (command === 'status') {
     const state = await tracker.getState();

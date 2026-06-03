@@ -160,8 +160,7 @@ async function handleAction(request, response, action) {
     nextState = await tracker.switch(getRequiredTicketId(payload));
   } else if (action === 'pause') {
     nextState = await tracker.pause();
-  } else if (action === 'punch-out') {
-    nextState = await tracker.punchOut();
+  }
   } else {
     sendJson(response, 404, { message: 'Route not found.' });
     return;
@@ -209,10 +208,7 @@ async function handleRequest(request, response) {
     return;
   }
 
-  if (request.method === 'POST' && url.pathname === '/punch-out') {
-    await handleAction(request, response, 'punch-out');
-    return;
-  }
+  
 
   if (url.pathname === '/favicon.ico') {
     response.writeHead(204);

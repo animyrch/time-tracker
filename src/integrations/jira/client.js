@@ -83,6 +83,35 @@ function createJiraClient({
         return bodyText;
       }
     }
+    ,
+
+    async getIssueSummary(issueKey) {
+      if (!isConfigured) {
+        return null;
+      }
+
+      const url = `${normalizedBaseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=summary`;
+      const response = await fetchImpl(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Basic ${Buffer.from(`${email}:${apiToken}`).toString('base64')}`
+        }
+      });
+
+      const bodyText = typeof response.text === 'function' ? await response.text() : '';
+
+      if (!response.ok) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(bodyText);
+        return parsed?.fields?.summary ?? null;
+      } catch (error) {
+        return null;
+      }
+    }
   };
 }
 
